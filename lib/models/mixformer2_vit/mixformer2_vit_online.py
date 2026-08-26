@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
 
 import timm.models.vision_transformer
 from timm.models.layers import DropPath, Mlp, trunc_normal_
@@ -75,16 +76,22 @@ class Attention(nn.Module):
         k_mt, k_s = torch.split(k, [t_h * t_w * 2, s_h * s_w + 4], dim=2)
         v_mt, v_s = torch.split(v, [t_h * t_w * 2, s_h * s_w + 4], dim=2)
 
-        # asymmetric mixed attention
-        attn = (q_mt @ k_mt.transpose(-2, -1)) * self.scale
-        attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)
-        x_mt = (attn @ v_mt).transpose(1, 2).reshape(B, t_h * t_w * 2, C)
+        # SDPA selects Flash Attention on supported CUDA hardware and avoids
+        # materializing the full quadratic attention matrices.
+        dropout_p = self.attn_drop.p if self.training else 0.0
+        x_mt = F.scaled_dot_product_attention(
+            q_mt,
+            k_mt,
+            v_mt,
+            dropout_p=dropout_p,
+        ).transpose(1, 2).reshape(B, t_h * t_w * 2, C)
 
-        attn = (q_s @ k.transpose(-2, -1)) * self.scale
-        attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)
-        x_s = (attn @ v).transpose(1, 2).reshape(B, s_h * s_w + 4, C)
+        x_s = F.scaled_dot_product_attention(
+            q_s,
+            k,
+            v,
+            dropout_p=dropout_p,
+        ).transpose(1, 2).reshape(B, s_h * s_w + 4, C)
 
         x = torch.cat([x_mt, x_s], dim=1)
         x = self.proj(x)
@@ -101,10 +108,13 @@ class Attention(nn.Module):
         qkv = torch.cat([self.qkv_mem, qkv_s], dim=3)
         _, k, v = qkv.unbind(0)
 
-        attn = (q_s @ k.transpose(-2, -1)) * self.scale
-        attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)
-        x = (attn @ v).transpose(1, 2).reshape(B, s_h*s_w + 4, C)
+        dropout_p = self.attn_drop.p if self.training else 0.0
+        x = F.scaled_dot_product_attention(
+            q_s,
+            k,
+            v,
+            dropout_p=dropout_p,
+        ).transpose(1, 2).reshape(B, s_h*s_w + 4, C)
 
         x = self.proj(x)
         x = self.proj_drop(x)
@@ -119,11 +129,13 @@ class Attention(nn.Module):
         self.qkv_mem = qkv
         q, k, v = qkv.unbind(0)   # make torchscript happy (cannot use tensor as tuple) [B, num_heads, N, C//num_heads]
 
-        # asymmetric mixed attention
-        attn = (q @ k.transpose(-2, -1)) * self.scale
-        attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)
-        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        dropout_p = self.attn_drop.p if self.training else 0.0
+        x = F.scaled_dot_product_attention(
+            q,
+            k,
+            v,
+            dropout_p=dropout_p,
+        ).transpose(1, 2).reshape(B, N, C)
 
         x = self.proj(x)
         x = self.proj_drop(x)
@@ -232,8 +244,19 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
 
         distill_feat_list = []
 
-        for i, blk in enumerate(self.blocks):
-            x = blk(x, H_t, W_t, H_s, W_s)
+        for blk in self.blocks:
+            if torch.is_grad_enabled() and x.requires_grad:
+                x = checkpoint(
+                    blk,
+                    x,
+                    H_t,
+                    W_t,
+                    H_s,
+                    W_s,
+                    use_reentrant=False,
+                )
+            else:
+                x = blk(x, H_t, W_t, H_s, W_s)
             distill_feat_list.append(x)
 
         x_t, x_ot, x_s, reg_tokens = torch.split(x, [H_t*W_t, H_t*W_t, H_s*W_s, 4], dim=1)
