@@ -58,7 +58,7 @@ def build_box_head(cfg):
     if cfg.MODEL.HEAD_TYPE == "MLP":
         feat_sz = cfg.MODEL.FEAT_SZ
         stride = cfg.DATA.SEARCH.SIZE / feat_sz
-        print("feat size: ", feat_sz, ", stride: ", stride)
+        #print("feat size: ", feat_sz, ", stride: ", stride)
         hidden_dim = cfg.MODEL.HIDDEN_DIM
         mlp_head = MlpHead(
             in_dim=hidden_dim,

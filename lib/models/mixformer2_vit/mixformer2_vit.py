@@ -204,8 +204,8 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
         pos_embed_s = get_2d_sincos_pos_embed(self.pos_embed_s.shape[-1], int(self.num_patches_s ** .5),
                                               cls_token=False)
         self.pos_embed_s.data.copy_(torch.from_numpy(pos_embed_s).float().unsqueeze(0))
-        if is_main_process():
-            print("Initialize pos embed with fixed sincos embedding.")
+        #if is_main_process():
+        #    print("Initialize pos embed with fixed sincos embedding.")
 
     def forward(self, x_t, x_ot, x_s):
         """

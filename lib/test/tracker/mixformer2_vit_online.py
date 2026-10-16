@@ -15,7 +15,7 @@ class MixFormerOnline(BaseTracker):
         super(MixFormerOnline, self).__init__(params)
         network = build_mixformer2_vit_online(params.cfg,  train=False)
         network.load_state_dict(torch.load(self.params.checkpoint, map_location='cpu', weights_only=False)['net'], strict=True)
-        print(f"Load checkpoint {self.params.checkpoint} successfully!")
+        #print(f"Load checkpoint {self.params.checkpoint} successfully!")
         self.cfg = params.cfg
         self.network = network.cuda()
         self.network.eval()
@@ -52,10 +52,10 @@ class MixFormerOnline(BaseTracker):
             self.max_score_decay = 1.0
         if not hasattr(params, 'vis_attn'):
             self.params.vis_attn = 0
-        print("Search factor: ", self.params.search_factor)
-        print("Update interval is: ", self.update_interval)
-        print("Online size is: ", self.online_size)
-        print("Max score decay: ", self.max_score_decay)
+        #print("Search factor: ", self.params.search_factor)
+        #print("Update interval is: ", self.update_interval)
+        #print("Online size is: ", self.online_size)
+        #print("Max score decay: ", self.max_score_decay)
 
 
     def initialize(self, image, info: dict):

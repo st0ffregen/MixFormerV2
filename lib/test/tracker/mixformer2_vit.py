@@ -14,7 +14,7 @@ class MixFormer(BaseTracker):
         super(MixFormer, self).__init__(params)
         network = build_mixformer2_vit(params.cfg)
         network.load_state_dict(torch.load(self.params.checkpoint, map_location='cpu')['net'], strict=True)
-        print(f"Load checkpoint {self.params.checkpoint} successfully!")
+        #print(f"Load checkpoint {self.params.checkpoint} successfully!")
         self.cfg = params.cfg
         self.network = network.cuda()
         self.network.eval()
@@ -35,7 +35,7 @@ class MixFormer(BaseTracker):
             self.update_intervals = self.cfg.TEST.UPDATE_INTERVALS[DATASET_NAME]
         else:
             self.update_intervals = self.cfg.DATA.MAX_SAMPLE_INTERVAL
-        print("Update interval is: ", self.update_intervals)
+        #print("Update interval is: ", self.update_intervals)
 
     def initialize(self, image, info: dict):
         # forward the template once
