@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import timm.models.vision_transformer
-from timm.models.layers import DropPath, Mlp
+from timm.layers import DropPath, Mlp
 
 from lib.utils.misc import is_main_process
 from lib.models.mixformer_vit.head import build_box_head
